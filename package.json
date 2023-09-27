@@ -81,7 +81,7 @@
     "pod-install": "^0.1.38",
     "prettier": "^2.8.8",
     "react": "^18.2.0",
-    "react-native": "^0.71.10",
+    "react-native": "^0.71.11",
     "react-native-builder-bob": "^0.20.4",
     "react-native-reanimated": "software-mansion/react-native-reanimated#5b93afe19c5451f67c3667efe1b6497daff54d4a",
     "release-it": "^15.11.0",
