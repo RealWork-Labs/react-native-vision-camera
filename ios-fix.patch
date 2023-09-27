@@ -1,0 +1,164 @@
+From e91b677f53c32d843dfc6f6d663f4302e9e526fe Mon Sep 17 00:00:00 2001
+From: ryuwakimoto <sidebook37@gmail.com>
+Date: Tue, 26 Sep 2023 11:22:42 +0900
+Subject: [PATCH] handle iPhone 15 / iOS17 according to
+ https://github.com/mrousavy/react-native-vision-camera/issues/1840#issuecomment-1732360337
+
+---
+ ios/CameraView+AVCaptureSession.swift         | 18 ++---
+ ...AVCaptureDevice.Format+matchesFilter.swift | 16 +++--
+ .../AVCaptureDevice.Format+toDictionary.swift |  4 +-
+ .../AVCaptureColorSpace+descriptor.swift      | 70 ++++++++++---------
+ 4 files changed, 58 insertions(+), 50 deletions(-)
+
+diff --git a/ios/CameraView+AVCaptureSession.swift b/ios/CameraView+AVCaptureSession.swift
+index 5c9b77d819..167d0ca542 100644
+--- a/ios/CameraView+AVCaptureSession.swift
++++ b/ios/CameraView+AVCaptureSession.swift
+@@ -195,14 +195,16 @@ extension CameraView {
+           device.automaticallyEnablesLowLightBoostWhenAvailable = lowLightBoost!.boolValue
+         }
+       }
+-      if let colorSpace = colorSpace as String? {
+-        guard let avColorSpace = try? AVCaptureColorSpace(string: colorSpace),
+-              device.activeFormat.supportedColorSpaces.contains(avColorSpace) else {
+-          invokeOnError(.format(.invalidColorSpace(colorSpace: colorSpace)))
+-          return
+-        }
+-        device.activeColorSpace = avColorSpace
+-      }
++      // https://github.com/mrousavy/react-native-vision-camera/issues/1840#issuecomment-1732360337
++      //
++      // if let colorSpace = colorSpace as String? {
++      //   guard let avColorSpace = try? AVCaptureColorSpace(string: colorSpace),
++      //         device.activeFormat.supportedColorSpaces.contains(avColorSpace) else {
++      //     invokeOnError(.format(.invalidColorSpace(colorSpace: colorSpace)))
++      //     return
++      //   }
++      //   device.activeColorSpace = avColorSpace
++      // }
+ 
+       device.unlockForConfiguration()
+       ReactLogger.log(level: .info, message: "Device successfully configured!")
+diff --git a/ios/Extensions/AVCaptureDevice.Format+matchesFilter.swift b/ios/Extensions/AVCaptureDevice.Format+matchesFilter.swift
+index 35789a6c99..7202ebab96 100644
+--- a/ios/Extensions/AVCaptureDevice.Format+matchesFilter.swift
++++ b/ios/Extensions/AVCaptureDevice.Format+matchesFilter.swift
+@@ -54,13 +54,15 @@ extension AVCaptureDevice.Format {
+         return false
+       }
+     }
+-    if let colorSpaces = filter.value(forKey: "colorSpaces") as? [String] {
+-      let avColorSpaces = colorSpaces.map { try? AVCaptureColorSpace(string: $0) }
+-      let allColorSpacesIncluded = supportedColorSpaces.allSatisfy { avColorSpaces.contains($0) }
+-      if !allColorSpacesIncluded {
+-        return false
+-      }
+-    }
++    // https://github.com/mrousavy/react-native-vision-camera/issues/1840#issuecomment-1732360337
++    //
++    // if let colorSpaces = filter.value(forKey: "colorSpaces") as? [String] {
++    //   let avColorSpaces = colorSpaces.map { try? AVCaptureColorSpace(string: $0) }
++    //   let allColorSpacesIncluded = supportedColorSpaces.allSatisfy { avColorSpaces.contains($0) }
++    //   if !allColorSpacesIncluded {
++    //     return false
++    //   }
++    // }
+     if let frameRateRanges = filter.value(forKey: "frameRateRanges") as? [NSDictionary] {
+       let allFrameRateRangesIncluded = videoSupportedFrameRateRanges.allSatisfy { range -> Bool in
+         frameRateRanges.contains { dict -> Bool in
+diff --git a/ios/Extensions/AVCaptureDevice.Format+toDictionary.swift b/ios/Extensions/AVCaptureDevice.Format+toDictionary.swift
+index fec83cae3b..dc274d6077 100644
+--- a/ios/Extensions/AVCaptureDevice.Format+toDictionary.swift
++++ b/ios/Extensions/AVCaptureDevice.Format+toDictionary.swift
+@@ -33,7 +33,9 @@ extension AVCaptureDevice.Format {
+       "minISO": minISO,
+       "fieldOfView": videoFieldOfView,
+       "maxZoom": videoMaxZoomFactor,
+-      "colorSpaces": supportedColorSpaces.map(\.descriptor),
++      // https://github.com/mrousavy/react-native-vision-camera/issues/1840#issuecomment-1732360337
++      //
++      // "colorSpaces": supportedColorSpaces.map(\.descriptor),
+       "supportsVideoHDR": isVideoHDRSupported,
+       "supportsPhotoHDR": false,
+       "frameRateRanges": videoSupportedFrameRateRanges.map {
+diff --git a/ios/Parsers/AVCaptureColorSpace+descriptor.swift b/ios/Parsers/AVCaptureColorSpace+descriptor.swift
+index 13a403b140..237af26eb3 100644
+--- a/ios/Parsers/AVCaptureColorSpace+descriptor.swift
++++ b/ios/Parsers/AVCaptureColorSpace+descriptor.swift
+@@ -6,39 +6,41 @@
+ //  Copyright © 2020 mrousavy. All rights reserved.
+ //
+ 
+-import AVFoundation
++// https://github.com/mrousavy/react-native-vision-camera/issues/1840#issuecomment-1732360337
+ 
+-extension AVCaptureColorSpace {
+-  init(string: String) throws {
+-    switch string {
+-    case "hlg-bt2020":
+-      if #available(iOS 14.1, *) {
+-        self = .HLG_BT2020
+-      } else {
+-        throw EnumParserError.unsupportedOS(supportedOnOS: "14.1")
+-      }
+-      return
+-    case "p3-d65":
+-      self = .P3_D65
+-      return
+-    case "srgb":
+-      self = .sRGB
+-      return
+-    default:
+-      throw EnumParserError.invalidValue
+-    }
+-  }
++// import AVFoundation
+ 
+-  var descriptor: String {
+-    switch self {
+-    case .HLG_BT2020:
+-      return "hlg-bt2020"
+-    case .P3_D65:
+-      return "p3-d65"
+-    case .sRGB:
+-      return "srgb"
+-    default:
+-      fatalError("AVCaptureDevice.Position has unknown state.")
+-    }
+-  }
+-}
++// extension AVCaptureColorSpace {
++//   init(string: String) throws {
++//     switch string {
++//     case "hlg-bt2020":
++//       if #available(iOS 14.1, *) {
++//         self = .HLG_BT2020
++//       } else {
++//         throw EnumParserError.unsupportedOS(supportedOnOS: "14.1")
++//       }
++//       return
++//     case "p3-d65":
++//       self = .P3_D65
++//       return
++//     case "srgb":
++//       self = .sRGB
++//       return
++//     default:
++//       throw EnumParserError.invalidValue
++//     }
++//   }
++
++//   var descriptor: String {
++//     switch self {
++//     case .HLG_BT2020:
++//       return "hlg-bt2020"
++//     case .P3_D65:
++//       return "p3-d65"
++//     case .sRGB:
++//       return "srgb"
++//     default:
++//       fatalError("AVCaptureDevice.Position has unknown state.")
++//     }
++//   }
++// }
